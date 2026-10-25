@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Решатель систем неравенств | Made by Dexoron & Claude.ai</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fbfcff;--grid:#cfdcf2;--ink:#1d2f8f;--text:#1d2f8f;--red:#c0392b;--soft:#e8eefc;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#14182b;--grid:#252c4a;--ink:#9db4ff;--text:#b9c8ff;--red:#ff8a7a;--soft:#1f2745}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:inherit}
+body{margin:0;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px;color:var(--text);font-family:'Caveat','Segoe Print','Comic Sans MS',cursive;font-size:24px;line-height:30px}
+main{max-width:680px;margin:0 auto;padding:12px 14px 40px}
+h1{font-size:36px;margin:0 0 6px}h2,h3{margin:14px 0 4px;color:var(--red);font-size:28px}
+textarea{width:100%;height:110px;font:18px/1.4 ui-monospace,Menlo,Consolas,monospace;background:var(--bg);color:var(--text);border:2px solid var(--ink);border-radius:8px;padding:8px}
+.bar{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+button{font:inherit;font-size:22px;line-height:28px;border:2px solid var(--ink);background:var(--soft);color:var(--text);border-radius:8px;padding:0 12px;cursor:pointer}
+button.go{background:var(--ink);color:var(--bg);font-weight:700}
+.hint{font-size:20px;line-height:24px;margin:4px 0 10px}
+p{margin:4px 0}.er{color:var(--red);font-weight:700}
+.sys{display:flex;align-items:center;overflow-x:auto;margin:4px 0}
+.br{border:solid var(--ink);border-width:2px 0 2px 2px;border-radius:12px 0 0 12px;width:10px;align-self:stretch;margin-right:8px;flex:none}
+.sys>div>span{display:block;padding:3px 0;white-space:nowrap}
+.fr{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;margin:0 3px;line-height:22px;font-size:.92em}
+.fr>span:first-child{border-bottom:2px solid currentColor;padding:0 3px}
+.two{display:flex;flex-wrap:wrap;gap:6px 36px;align-items:center}.chk{display:flex;align-items:center;gap:6px;font-size:22px;cursor:pointer}.chk input{width:22px;height:22px}
+.task{margin:0 0 18px}
+.line{overflow-x:auto;margin:6px 0}.line svg{display:block}
+.ans{font-weight:700;font-size:27px;margin-top:8px}.ans b{color:var(--red)}
+</style>
+</head>
+<body>
+<main>
+<h1>Решатель систем неравенств</h1>
+<textarea id="in" spellcheck="false" aria-label="Неравенства"></textarea>
+<div class="bar"><button class="go" id="go">Решить</button><label class="chk"><input type="checkbox" id="vb"> Подробный режим</label><button data-i="≤">≤</button><button data-i="≥">≥</button><button data-i="²">x²</button></div>
+<div class="bar" id="ex"></div>
+<p class="hint">Каждое неравенство с новой строки. Дроби пишите через /, степень через ^ или ². Пример: (x+4)/(x-2)&lt;=0. Только переменная x; корни многочленов степени выше 2 ищутся численно.</p>
+<div id="out"></div>
+</main>
+<script>
+const $=id=>document.getElementById(id),OP={'>':'>','<':'<','>=':'≥','<=':'≤'},FL={'>':'<','<':'>','>=':'<=','<=':'>='};
+const tr=p=>{p=p.slice();while(p.length>1&&Math.abs(p[p.length-1])<1e-12)p.pop();return p},dg=p=>p.length-1;
+const pa=(a,b)=>tr(Array.from({length:Math.max(a.length,b.length)},(_,i)=>(a[i]||0)+(b[i]||0)));
+const pm=(a,b)=>{const r=Array(a.length+b.length-1).fill(0);a.forEach((x,i)=>b.forEach((y,j)=>r[i+j]+=x*y));return tr(r)};
+const ps=(a,k)=>tr(a.map(x=>x*k)),pv=(p,x)=>p.reduceRight((s,c)=>s*x+c,0),gcd=(a,b)=>b?gcd(b,a%b):a;
+const dr=p=>tr(p.slice(1).map((c,i)=>c*(i+1)));
+function nz(p){let k=1;for(;k<=5000;k++)if(p.every(c=>Math.abs(c*k-Math.round(c*k))<1e-7))break;if(k>5000)return p;p=p.map(c=>Math.round(c*k));const g=p.reduce((a,c)=>gcd(a,Math.abs(c)),0)||1;return p.map(c=>c/g)}
+function roots(p){const m=dg(p);if(m<1)return[];if(m==1)return[-p[0]/p[1]];
+ if(m==2){const D=p[1]*p[1]-4*p[2]*p[0];if(D<-1e-9)return[];if(D<1e-9)return[-p[1]/(2*p[2])];const q=Math.sqrt(D);return[(-p[1]-q)/(2*p[2]),(-p[1]+q)/(2*p[2])].sort((a,b)=>a-b)}
+ const c=roots(dr(p)),B=1+Math.max(...p.slice(0,m).map(Math.abs))/Math.abs(p[m]),xs=[-B,...c,B],r=[];
+ c.forEach(v=>{if(Math.abs(pv(p,v))<1e-7)r.push(v)});
+ for(let i=0;i<xs.length-1;i++){let a=xs[i],b=xs[i+1],fa=pv(p,a);if(fa*pv(p,b)<0){for(let k=0;k<100;k++){const mid=(a+b)/2,fm=pv(p,mid);if(fa*fm<=0)b=mid;else{a=mid;fa=fm}}r.push((a+b)/2)}}
+ return r.sort((a,b)=>a-b)}
+// разбор
+function parse(s){s=s.toLowerCase().replace(/\s+/g,'').replace(/[−–—]/g,'-').replace(/[·×]/g,'*').replace(/²/g,'^2').replace(/³/g,'^3').replace(/,/g,'.').replace(/[÷:]/g,'/');
+ const t=s.match(/\d+\.?\d*|\.\d+|x|[-+*\/^()]|./g)||[];let i=0;const pk=()=>t[i],nx=()=>t[i++];
+ const ex=()=>{let a=tm();while(pk()=='+'||pk()=='-'){const o=nx();a={t:o,a,b:tm()}}return a};
+ const tm=()=>{let a=un();for(;;){const c=pk();if(c=='*'||c=='/'){nx();a={t:c,a,b:un()}}else if(c=='('||c=='x')a={t:'*',a,b:un(),im:1};else return a}};
+ const un=()=>pk()=='-'?(nx(),{t:'neg',a:un()}):pw();
+ const pw=()=>{const a=at();if(pk()=='^'){nx();let g=1;if(pk()=='-'){nx();g=-1}const e=nx();if(!/^\d+$/.test(e||'')||+e>8)throw Error('Степень должна быть целым числом до 8');return{t:'^',a,e:g*+e}}return a};
+ const at=()=>{const c=nx();if(c=='x')return{t:'x'};if(c=='('){const a=ex();if(nx()!=')')throw Error('Не закрыта скобка');return{t:'p',a}}if(c&&/^[\d.]/.test(c))return{t:'n',v:parseFloat(c)};throw Error('Не понял «'+(c||'конец записи')+'»')};
+ const r=ex();if(i<t.length)throw Error('Не понял «'+t[i]+'»');return r}
+const R1=v=>({n:[v],d:[1]});
+function ev(n){switch(n.t){case'n':return R1(n.v);case'x':return{n:[0,1],d:[1]};case'p':return ev(n.a);
+ case'neg':{const a=ev(n.a);return{n:ps(a.n,-1),d:a.d}}
+ case'+':case'-':{const a=ev(n.a),b=ev(n.b);return{n:pa(pm(a.n,b.d),ps(pm(b.n,a.d),n.t=='-'?-1:1)),d:pm(a.d,b.d)}}
+ case'*':{const a=ev(n.a),b=ev(n.b);return{n:pm(a.n,b.n),d:pm(a.d,b.d)}}
+ case'/':{const a=ev(n.a),b=ev(n.b);if(b.n.length==1&&Math.abs(b.n[0])<1e-12)throw Error('Деление на ноль');return{n:pm(a.n,b.d),d:pm(a.d,b.n)}}
+ case'^':{const a=ev(n.a);let r=R1(1);for(let k=0;k<Math.abs(n.e);k++)r={n:pm(r.n,a.n),d:pm(r.d,a.d)};return n.e<0?{n:r.d,d:r.n}:r}}}
+// вывод
+const F=(a,b)=>'<span class="fr"><span>'+a+'</span><span>'+b+'</span></span>';
+function RT(n,st){switch(n.t){case'n':return String(n.v).replace('.',',');case'x':return'x';case'p':return st?RT(n.a):'('+RT(n.a)+')';case'neg':return'−'+RT(n.a);
+ case'+':return RT(n.a)+' + '+RT(n.b);case'-':return RT(n.a)+' − '+RT(n.b);case'*':return RT(n.a)+(n.im?'':' · ')+RT(n.b);case'/':return F(RT(n.a,1),RT(n.b,1));case'^':return RT(n.a)+'<sup>'+n.e+'</sup>'}}
+function fr(v){if(Math.abs(v-Math.round(v))<1e-9)return[Math.round(v),1];for(let d=2;d<=1000;d++){const n=Math.round(v*d);if(Math.abs(v-n/d)<1e-9){const g=gcd(Math.abs(n),d);return[n/g,d/g]}}return null}
+const dec=v=>(+v.toFixed(3)).toString().replace('.',',').replace('-','−'),pr=v=>v<0?'('+dec(v)+')':dec(v);
+const ft=v=>fr(v)?dec(v):'≈'+dec(v);
+function fs(v){const f=fr(v);if(!f)return'≈'+dec(v);if(100%f[1]==0)return dec(f[0]/f[1]);return(f[0]<0?'−':'')+F(Math.abs(f[0]),f[1])}
+function pt(p){let s='';for(let i=p.length-1;i>=0;i--){const c=p[i];if(Math.abs(c)<1e-12&&p.length>1)continue;const a=Math.abs(c);s+=(s?(c<0?' − ':' + '):(c<0?'−':''))+((i==0||Math.abs(a-1)>1e-9)?dec(a):'')+(i?'x'+(i>1?'<sup>'+i+'</sup>':''):'')}return s||'0'}
+const isI=v=>Math.abs(v)==Infinity;
+const ss=S=>!S.length?'∅':S.map(a=>Math.abs(a[0]-a[1])<1e-9?'{'+fs(a[0])+'}':(a[2]?'[':'(')+(a[0]==-Infinity?'−∞':fs(a[0]))+'; '+(a[1]==Infinity?'+∞':fs(a[1]))+(a[3]?']':')')).join(' ∪ ');
+function mi(S){let b=Infinity;for(const a of S){if(a[0]==-Infinity)return'нет (множество не ограничено снизу)';let n=Math.ceil(a[0]-1e-9);if(!a[2]&&Math.abs(n-a[0])<1e-9)n++;if(n<a[1]-1e-9||(Math.abs(n-a[1])<1e-9&&a[3]))b=Math.min(b,n)}return b==Infinity?'нет':String(b).replace('-','−')}
+function ix(A,B){const r=[];A.forEach(a=>B.forEach(b=>{let lo,lc,hi,hc;
+ if(Math.abs(a[0]-b[0])<1e-9){lo=a[0];lc=a[2]&&b[2]}else if(a[0]>b[0]){lo=a[0];lc=a[2]}else{lo=b[0];lc=b[2]}
+ if(Math.abs(a[1]-b[1])<1e-9){hi=a[1];hc=a[3]&&b[3]}else if(a[1]<b[1]){hi=a[1];hc=a[3]}else{hi=b[1];hc=b[3]}
+ if(lo<hi-1e-9||(Math.abs(lo-hi)<1e-9&&lc&&hc))r.push([lo,hi,lc?1:0,hc?1:0])}));return r.sort((x,y)=>x[0]-y[0])}
+// знаки и множество решений
+function core(N,D,op){const rn=roots(N),rd=roots(D),near=(a,v)=>a.some(r=>Math.abs(r-v)<1e-7);
+ const P=[...rn,...rd].sort((a,b)=>a-b).filter((v,i,a)=>!i||v-a[i-1]>1e-7),k=P.length,ns=op.length==2,want=op[0]=='>'?1:-1;
+ const sg=[];for(let i=0;i<=k;i++){const t=k==0?0:i==0?P[0]-1:i==k?P[k-1]+1:(P[i-1]+P[i])/2;sg.push(Math.sign(pv(N,t))*Math.sign(pv(D,t)))}
+ const pc=P.map(v=>ns&&near(rn,v)&&!near(rd,v)),inc=[];for(let i=0;i<=k;i++){inc.push(sg[i]==want);if(i<k)inc.push(pc[i])}
+ const set=[];let i=0;while(i<inc.length){if(!inc[i]){i++;continue}let j=i;while(j+1<inc.length&&inc[j+1])j++;let lo,lc=0,hi,hc=0;
+  if(i%2){lo=P[(i-1)/2];lc=1}else lo=i==0?-Infinity:P[i/2-1];
+  if(j%2){hi=P[(j-1)/2];hc=1}else hi=j==inc.length-1?Infinity:P[j/2];
+  set.push([lo,hi,lc,hc]);i=j+1}
+ return{P,pc,sg,set}}
+function rb(p,nm){const m=dg(p),t=nm?'<b>'+nm+':</b> ':'',e=pt(p)+' = 0';if(m<1)return'';if(!V)return m==2&&p[0]&&p[1]?'<p>'+(nm?nm+': ':'')+'D = '+fs(p[1]*p[1]-4*p[2]*p[0])+'</p>':'';
+ if(m==1)return'<p>'+t+e+' → x = '+fs(-p[0]/p[1])+'</p>';
+ if(m==2){const[c,b,a]=p,D=b*b-4*a*c,rs=roots(p);if(b==0||c==0){let h='<p>'+t+e+'</p>';if(c==0&&b==0)return h+'<p>x² = 0 → x = 0</p>';if(c==0)return h+'<p>x('+pt([b,a])+') = 0</p><p>x = 0 или '+pt([b,a])+' = 0 → x = '+fs(-b/a)+'</p>';const v=-c/a;h+=(a==1?'':'<p>'+pt([0,0,a])+' = '+fs(-c)+'</p>')+'<p>x² = '+fs(v)+'</p>';return h+(v<0?'<p>Квадрат не может быть отрицательным, корней нет</p>':'<p>x = ± '+(fr(Math.sqrt(v))?fs(Math.sqrt(v)):'√'+fs(v))+'</p><p>x<sub>1</sub> = '+fs(rs[0])+',&ensp; x<sub>2</sub> = '+fs(rs[1])+'</p>')}let h='<p>'+t+e+'</p><p>D = b² − 4ac = '+pr(b)+'² − 4·'+pr(a)+'·'+pr(c)+' = '+fs(D)+'</p>';
+  if(!rs.length)return h+'<p>D &lt; 0, корней нет</p>';
+  if(rs.length==1)return h+'<p>D = 0, x = '+F(fs(-b),fs(2*a))+' = '+fs(rs[0])+'</p>';
+  return h+'<p>x<sub>1,2</sub> = '+F(fs(-b)+' ± √'+fs(D),fs(2*a))+'</p><p>x<sub>1</sub> = '+fs(rs[0])+',&ensp; x<sub>2</sub> = '+fs(rs[1])+'</p>'}
+ return'<p>'+t+e+'</p><p>Корни (численно): '+roots(p).map((v,i)=>'x<sub>'+(i+1)+'</sub> = '+fs(v)).join(',&ensp; ')+'</p>'}
+// рисунок
+let uid=0,V=false;
+const T=(x,y,c,sz=19)=>'<text x="'+x+'" y="'+y+'" text-anchor="middle" fill="currentColor" stroke="none" font-size="'+sz+'">'+c+'</text>';
+function lab(x,y,v){const f=fr(v);if(f&&100%f[1]){const n=String(Math.abs(f[0])),d=String(f[1]),w=Math.max(n.length,d.length)*5+4;
+ return T(x,y,n)+'<line x1="'+(x-w)+'" x2="'+(x+w)+'" y1="'+(y+4)+'" y2="'+(y+4)+'" stroke-width="1.5"/>'+T(x,y+19,d)+(f[0]<0?T(x-w-7,y+12,'−'):'')}return T(x,y,ft(v))}
+function fig(rows,P,ans){const W=360,L=40,R=W-40,mn=Math.min(...P),mx=Math.max(...P),id='h'+uid++,X=v=>P.length<2||mx-mn<1e-9?W/2:L+(v-mn)/(mx-mn)*(R-L);
+ const Hs=rows.map(r=>r.arc?170:106);let top=0;const ys=rows.map((r,j)=>{const y=top+(r.arc?62:30);top+=Hs[j];return y});
+ let s='<defs><pattern id="'+id+'" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><line x1="0" y1="0" x2="0" y2="7" stroke="currentColor" stroke-width="1.5"/></pattern></defs><g stroke="currentColor" fill="none" stroke-width="2">';
+ const x1o=a=>isI(a[0])?6:X(a[0]),x2o=a=>isI(a[1])?W-6:X(a[1]);
+ if(ans){const y0=ys[0]-22,h=ys[ys.length-1]-y0+10;
+  ans.forEach(a=>{const x1=x1o(a),x2=x2o(a);s+=x2-x1<1?'<line x1="'+x1+'" x2="'+x1+'" y1="'+y0+'" y2="'+(y0+h)+'" stroke-width="4"/>':'<rect x="'+x1+'" y="'+y0+'" width="'+(x2-x1)+'" height="'+h+'" fill="'+'url(#'+id+')" stroke="none" opacity=".55"/><rect x="'+x1+'" y="'+y0+'" width="'+(x2-x1)+'" height="'+h+'" fill="currentColor" stroke="none" opacity=".07"/>'});
+  P.forEach(v=>s+='<line x1="'+X(v)+'" x2="'+X(v)+'" y1="'+y0+'" y2="'+(y0+h)+'" stroke-dasharray="4 4" stroke-width="1" opacity=".7"/>')}
+ rows.forEach((r,j)=>{const y=ys[j];s+='<line x1="4" x2="'+(W-4)+'" y1="'+y+'" y2="'+y+'" stroke-width="2"/>';
+  r.set.forEach(a=>{const x1=x1o(a),x2=x2o(a);if(x2-x1>1)s+='<rect x="'+x1+'" y="'+(y-14)+'" width="'+(x2-x1)+'" height="14" fill="url(#'+id+')" stroke="none"/><line x1="'+x1+'" x2="'+x2+'" y1="'+(y-14)+'" y2="'+(y-14)+'" stroke-width="1.5"/>'});
+  let pts=[];
+  if(r.arc){const b=[null,...r.P,null];r.sg.forEach((sn,i)=>{const a0=b[i],b0=b[i+1],pl=sn>0,d=pl?-1:1,h=pl?34:26;let tx,p;
+   if(a0!==null&&b0!==null){const xa=X(a0),xb=X(b0),c=y+d*h*1.33;p='M'+xa+' '+y+'C'+xa+' '+c+' '+xb+' '+c+' '+xb+' '+y;tx=(xa+xb)/2}
+   else if(a0===null){const xb=X(b0);p='M'+xb+' '+y+'Q'+(xb-8)+' '+(y+d*h)+' 6 '+(y+d*h);tx=Math.max(20,xb-46)}
+   else{const xa=X(a0);p='M'+xa+' '+y+'Q'+(xa+8)+' '+(y+d*h)+' '+(W-6)+' '+(y+d*h);tx=Math.min(W-20,xa+46)}
+   s+='<path d="'+p+'"/>'+T(tx,pl?y-h-6:y+19,pl?'+':'−',24)});
+   r.P.forEach((v,i)=>{pts.push(v);s+='<circle cx="'+X(v)+'" cy="'+y+'" r="5.5" fill="'+(r.pc[i]?'currentColor':'var(--bg)')+'"/>'})}
+  else r.set.forEach(a=>[[a[0],a[2]],[a[1],a[3]]].forEach(e=>{if(!isI(e[0])){if(!pts.some(v=>Math.abs(v-e[0])<1e-9))pts.push(e[0]);s+='<circle cx="'+X(e[0])+'" cy="'+y+'" r="5.5" fill="'+(e[1]?'currentColor':'var(--bg)')+'"/>'}}));
+  pts.sort((a,b)=>a-b).forEach((v,i,a)=>{const st=i%2&&X(v)-X(a[i-1])<48?26:0;s+=lab(X(v),y+(r.arc?52:24)+st,v)});
+  if(rows.length>1)s+=T(12,y-(r.arc?48:22),(j+1)+')',17)});
+ return'<div class="line"><svg viewBox="0 0 '+W+' '+(top+4)+'" width="'+W+'" role="img" aria-label="Числовая ось">'+s+'</g></svg></div>'}
+// решение одного неравенства
+function one(it){let{L,R,op}=it;const l=ev(L),r=ev(R);let N=pa(pm(l.n,r.d),ps(pm(r.n,l.d),-1)),D=pm(l.d,r.d),fl=0;
+ let h=V?'<p>'+RT(L,1)+' '+OP[op]+' '+RT(R,1)+'</p>':'';
+ if(dg(D)==0){N=ps(N,1/D[0]);D=[1]}else if(D[dg(D)]<0){N=ps(N,-1);D=ps(D,-1)}
+ N=nz(N);D=nz(D);const lin=dg(D)==0&&dg(N)<=1;
+ if(!lin&&dg(D)==0&&N[dg(N)]<0){N=ps(N,-1);op=FL[op];fl=1}
+ h+='<p>'+(V?(fl?'Перенесём всё влево и умножим на −1 (знак меняется): ':'Перенесём всё влево: '):'∼ ')+(dg(D)?F(pt(N),pt(D)):pt(N))+' '+OP[op]+' 0</p>';
+ const c=core(N,D,op);
+ if(lin){if(dg(N)==0)h+='<p>'+pt(N)+' '+OP[op]+' 0 — '+(c.set.length?'верно при любом x':'неверно, решений нет')+'</p>';
+  else{const a=N[1],b=N[0];h+=(V?'<p>'+pt([0,a])+' '+OP[op]+' '+fs(-b)+'</p>':'')+'<p>'+(V?'':'∼ ')+'x '+OP[a<0?FL[op]:op]+' '+fs(-b/a)+(a<0&&V?'&ensp;(делим на отрицательное число — знак меняется)':'')+'</p>'}}
+ else{h+=rb(N,dg(D)?'числитель':'');if(dg(D))h+=rb(D,'знаменатель')}
+ h+=c.P.length?'<p>'+c.P.map(v=>'x = '+fs(v)).join(',&ensp; ')+'</p>':'<p>Корней нет.</p>';
+ h+=fig([{set:c.set,P:c.P,pc:c.pc,sg:c.sg,arc:!lin&&c.P.length>0}],c.P)+'<p class="ans">x ∈ <b>'+ss(c.set)+'</b></p>';
+ return{h,...c,arc:!lin&&c.P.length>0}}
+const hx=n=>!!n&&(n.t=='x'||hx(n.a)||hx(n.b));
+function dens(n,o){if(!n||n.t=='n'||n.t=='x')return;if(n.t=='/'&&hx(n.b))o.push(n.b);if(n.t=='^'&&n.e<0&&hx(n.a))o.push(n.a);dens(n.a,o);dens(n.b,o)}
+function odz(its){const o=[];its.forEach(q=>{dens(q.L,o);dens(q.R,o)});if(!o.length)return'';
+ const ls=[],vs=[];o.forEach(d=>{const s=RT(d,1)+' ≠ 0';if(!ls.includes(s))ls.push(s);roots(nz(ev(d).n)).forEach(v=>{if(!vs.some(u=>Math.abs(u-v)<1e-7))vs.push(v)})});
+ vs.sort((a,b)=>a-b);const Q=ls.concat(vs.map(v=>'x ≠ '+fs(v)).filter(s=>!ls.includes(s)));
+ return'<div class="two"><b>ОДЗ:</b><div class="sys"><span class="br">&nbsp;</span><div>'+Q.map(s=>'<span>'+s+'</span>').join('')+'</div></div></div>'}
+function run(){V=$('vb').checked;const o=$('out');try{const its=[];
+ $('in').value.replace(/[{}]/g,'').split(/[\n;]+/).map(s=>s.trim()).filter(Boolean).forEach(line=>{
+  const t=line.replace(/≥|=>/g,'>=').replace(/≤|=</g,'<=').split(/(>=|<=|>|<)/);
+  if(t.length!=3&&t.length!=5)throw Error('В строке «'+line+'» нужен знак неравенства (&lt; &gt; ≤ ≥)');
+  const e=[];for(let i=0;i<t.length;i+=2)e.push(parse(t[i]));
+  for(let i=0;i<t.length-1;i+=2)its.push({L:e[i/2],R:e[i/2+1],op:t[i+1]})});
+ if(!its.length)throw Error('Введите неравенства');
+ let h='<h2>Дано</h2><div class="two"><div class="sys"><span class="br">&nbsp;</span><div>'+its.map(q=>'<span>'+RT(q.L,1)+' '+OP[q.op]+' '+RT(q.R,1)+'</span>').join('')+'</div></div>'+odz(its)+'</div>';
+ const rs=its.map(one);rs.forEach((q,i)=>h+='<section class="task"><h3>'+(its.length>1?'Неравенство '+(i+1):'Решение')+'</h3>'+q.h+'</section>');
+ let A=rs[0].set;for(let i=1;i<rs.length;i++)A=ix(A,rs[i].set);
+ if(rs.length>1){const P=[].concat(...rs.map(q=>q.P)).sort((a,b)=>a-b).filter((v,i,a)=>!i||v-a[i-1]>1e-7);
+  h+='<section class="task"><h3>Общее решение</h3>'+(P.length?'<p>'+P.map(v=>'x = '+fs(v)).join(',&ensp; ')+'</p>':'')+fig(rs.map(q=>({set:q.set,P:q.P,pc:q.pc,sg:q.sg,arc:q.arc})),P,A)+'</section>'}
+ h+=A.length?'<p class="ans">Ответ: x ∈ <b>'+ss(A)+'</b>.<br>Наименьшее целое: <b>'+mi(A)+'</b></p>':'<p class="ans">Ответ: <b>решений нет</b> (∅)</p>';
+ o.innerHTML=h}catch(e){o.innerHTML='<p class="er">'+e.message+'</p>'}}
+const EX={'3А.049':'x+3>0\n2x<3','3А.053':'(x+4)/(x-2)<=0\nx(x-5)<0','3А.054':'x²>16\nx²-16x<=0','3А.055':'2x²+9x<=-7\n2x+5<=0','3А.058':'12x²-(2x-3)(6x+1)>x\n(5x-1)(5x+1)-25x²>x-6','3А.059':'(6-x)/(x+10)>=0\nx-6>=0','3А.060':'x²/x>-3\nx<4'};
+Object.keys(EX).forEach(k=>{const b=document.createElement('button');b.textContent=k;b.onclick=()=>{$('in').value=EX[k];run()};$('ex').appendChild(b)});
+document.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{const a=$('in');a.setRangeText(b.dataset.i,a.selectionStart,a.selectionEnd,'end');a.focus()});
+$('vb').onchange=run;$('go').onclick=run;$('in').addEventListener('keydown',e=>{if(e.key=='Enter'&&(e.ctrlKey||e.metaKey))run()});
+$('in').value=EX['3А.053'];run();
+</script>
+</body>
+</html>
